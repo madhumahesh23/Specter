@@ -1,0 +1,63 @@
+﻿  .slicer {
+            border: 1px solid;
+            display: inline-block;
+            overflow: auto;
+        }
+
+        .slicer-content {
+            overflow: auto;
+            text-align: center;
+            height: 170px;
+            font-size:12px;
+        }
+        .slicer-content input[type=radio],input[type=checkbox]{
+            float:left;
+        }
+        .slicer-content-selected {
+            background-color: #CAE7FF;
+        }
+
+        .slicer-clear {
+            /*background-image: url("Images/delete.png");
+                width:5px;
+                height:5px;*/
+            float: right;
+            font-family: sans-serif;
+            cursor: pointer;
+        }
+
+        .slicer-content .content {
+            border: 1px solid;
+            margin: 2px;
+            padding: 5px;
+            cursor: pointer;
+        }
+        
+        .slicer-table {
+            text-align: center;
+            margin: 5px;
+        }
+
+        .slicer-table td {
+            border: 1px solid;
+            padding: 8px;
+            cursor: pointer;
+        }
+
+        .slicer .heading {
+            padding: 5px;
+            border-bottom: 1px solid;
+        }
+
+.rangepicker {
+    padding: 5px;
+    border: 1px solid;
+    width: 250px;
+    display: inline-block;
+    float: left;
+}
+            .rangepicker .heading {
+                padding: 5px;
+                border-bottom: 1px solid;
+                margin-bottom: 10px;
+            }

@@ -1,0 +1,1089 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Safety</title>
+    <script src="Scripts/jquery-1.11.3.min.js"></script>
+    <!--<script src="Scripts/highcharts.js"></script>-->
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="http://code.highcharts.com/highcharts-more.js"></script>
+<script src="Scripts/SpecterHelper.js"></script>
+    <script src="Scripts/ChartContentProvider.js"></script>
+    <script src="Scripts/Specter-1.0.js"></script>
+    <script>
+
+        var specValue = {
+            Name: "Physician Report",
+            Datasets: [{
+                "Table": "providersafetyevents",
+                "Name": "safetyevents",
+                "Type": "Table"
+            }, {
+                "StoredProcedure": "getsafetyFunnelData",// //getSafetyFunnelData
+                "Name": "funnelplotsp",
+                "Type": "StoredProcedure",
+                //"InMemory": false,
+                Parameters: ['@EventCategory','@EventType','@Emplstatus', '@ProviderID', '@LocationName', '@MonthNumber', '@Year'],
+                Columns: {
+                    "Providerid" : 'varchar(50)',
+                    'providername': 'varchar(50)',
+                    'denominator': 'int', 'rate': 'float',
+                    'systemaverage': 'float', 'lowerlimit': 'float', 'upperlimit': 'float'
+                }
+            }, {
+                "Table": "Analytics_PROVIDER_MASTERING_LIST",
+                "Name": "provlist",
+                "Type": "Table"
+            }],
+            Relationships: [{
+                Name: "asdfbd",
+                Dataset: "funnelplotsp",
+                Field: "providerid",
+                LookupDataset: "provlist",
+                LookupField: "provid"
+            }, {
+                Name: "timelyprovmasterlistrel",
+                Dataset: "safetyevents",
+                Field: "providerid",
+                LookupDataset: "provlist",
+                LookupField: "provid"
+            }],
+            Parameters: [{
+                Name: "@ProviderID"
+            }],
+            Charts: [{
+                Name: "GroupChart",
+                Provider: "highcharts",
+                Content: paretoDefault,
+                RenderTo: "paretochartDiv",
+                RenderOnLoad: true,
+                SeriesCollection: [
+                    {
+                        Fields: [],
+                        name: "Group Series",
+                        data: {
+                            Fields: ["EventCategory", "SumOfNumerator"],
+                            name: "{{EventCategory}}",
+                            y: "{{SumOfNumerator}}"
+                        },
+                        pointWidth: 35,
+                        onClick: function (event) {
+                            var thisChart = this.ChartProvider;
+                            thisChart.CanRender = false;
+                            var eventTypeChart = thisChart.Parent.getChart("EventTypeChart");
+                            eventTypeChart.CanRender = true;
+                            var funnelChart = thisChart.Parent.getChart("FunnelChart");                           
+                            funnelChart.CanRender = true;
+                            showFilters(event);
+                        },
+                        onClear: function () {
+                            //this - current series
+                            var chart = this.ChartProvider;
+                            var specter = chart.Parent;
+                            var eventTypeChart = specter.getChart("EventTypeChart");
+                            eventTypeChart.CanRender = false;                           
+                            delete eventTypeChart.Selected;
+                            var groupChart = specter.getChart("GroupChart");
+                            delete groupChart.Selected; //newly added
+                            groupChart.CanRender = true;
+                            groupChart.Render();
+                            var funnelChart = specter.getChart("FunnelChart");
+                            delete funnelChart.Selected; //newly added
+                            funnelChart.CanRender = false;
+                            funnelChart.hide();
+                        },
+                        LinkedItems: [
+                        {
+                            Name: "EventTypeChart",
+                            Type: "Chart",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@EventCategory",
+                                Value: "{{data.EventCategory}}"
+                            }]
+                        },{
+                            Name: "TimeSeriesChart",
+                            Type: "Chart",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@EventCategory",
+                                Value: "{{data.EventCategory}}"
+                            }]
+                        }, {
+                            Name: "FunnelChart",
+                            Type: "Chart",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@EventCategory",
+                                Value: "{{data.EventCategory}}"
+                            }]
+                        }, {
+                            Name: "YearSlicer",
+                            Type: "Slicer",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@EventCategory",
+                                Value: "{{data.EventCategory}}"
+                            }]
+                        }, {
+                            Name: "LocationSlicer",
+                            Type: "Slicer",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@EventCategory",
+                                Value: "{{data.EventCategory}}"
+                            }]
+                        }]
+                    }
+                ],
+                Parameters: [
+                {
+                    Name: "@ProviderID"
+                },
+                {
+                    Name: "@LocationName"
+                },
+                {
+                    Name: "@Year"
+                },
+                {
+                    Name: "@Month"
+                }],
+                // Datasets: ["DS2", "DS3"],
+                QuerySet: {
+                    Select: [
+                         {
+                             Field: "safetyevents.EventCategory",
+                             Dataset: "safetyevents",
+                             Aggregation: "",
+                             Alias: "EventCategory"
+                         },
+                        {
+                            Field: "sum(Numerator)",
+                            Dataset: "safetyevents",
+                            Aggregation: "",
+                            Alias: "SumOfNumerator",
+                            Order: "desc"
+                        }
+                    ],
+                    Where: [{
+                        Dataset: "safetyevents",
+                        Field: "ProviderID",
+                        Value: "@ProviderID"
+                    },
+                    {
+                        Dataset: "safetyevents",
+                        Field: "LocationName",
+                        Value: "@LocationName"
+                    },
+                    {
+                        Dataset: "safetyevents",
+                        Field: "Year",
+                        Value: "@Year"
+                    },
+                    {
+                        Dataset: "safetyevents",
+                        Field: "MonthNumber",
+                        Value: "@Month"
+                    }
+                    ]
+                }
+            }, {
+                Name: "EventTypeChart",
+                Provider: "highcharts",
+                Content: paretoDefault,
+                RenderTo: "paretochartDiv",
+                CanRender: false,
+                RenderOnLoad: false,
+                SeriesCollection: [
+                    {
+                        Fields: [],
+                        name: "Event Type Series",
+                        data: {
+                            Fields: ["EventType", "SumOfNonCompliant"],
+                            name: "{{EventType}}",
+                            y: "{{SumOfNonCompliant}}"
+                        },
+                        pointWidth: 35,
+                        onClick: function (event) {
+                            showFilters(event);
+                        },
+                        onClear: function () {
+                            var chart = this.ChartProvider;
+                            var specter = chart.Parent;
+                            var eventTypeChart = specter.getChart("EventTypeChart");
+                            delete eventTypeChart.Selected;
+                        },
+                        LinkedItems: [{
+                            Action: "RENDER",
+                            Name: "EventTypeChart",
+                            Type: "Chart"
+                        }, {
+                            Name: "TimeSeriesChart",
+                            Type: "Chart",
+                            Action :"SLICE",
+                            Parameters: [{
+                                Name: "@EventType",
+                                Value : "{{data.EventType}}"
+                            }]
+                        },
+                        {
+                            Name: "FunnelChart",
+                            Type: "Chart",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@EventType",
+                                Value: "{{data.EventType}}"
+                            }]
+                        }, {
+                            Name: "YearSlicer",
+                            Type: "Slicer",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@EventType",
+                                Value: "{{data.EventType}}"
+                            }]
+                        }, {
+                            Name: "LocationSlicer",
+                            Type: "Slicer",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@EventType",
+                                Value: "{{data.EventType}}"
+                            }]
+                        }
+                        ]
+                    }
+                ],
+                Parameters: [
+                    {
+                        Name: "@EventCategory"
+                    },
+                  {
+                      Name: "@ProviderID"
+                  },
+                {
+                    Name: "@LocationName"
+                },
+                {
+                    Name :"@Year"
+                },
+                {
+                    Name: "@Month"
+                }],
+                // Datasets: ["DS2", "DS3"],
+                QuerySet: {
+                    Select: [
+                         {
+                             Field: "safetyevents.EventType",
+                             Dataset: "safetyevents",
+                             Aggregation: "",
+                             Alias: ""
+                         },
+                        {
+                            Field: "sum(safetyevents.Numerator)",
+                            Dataset: "safetyevents",
+                            Aggregation: "",
+                            Alias: "SumOfNonCompliant",
+                            Order :"desc"
+                        }
+                    ],
+                    Where: [{
+                        Dataset: "safetyevents",
+                        Field: "EventCategory",
+                        Value: "@EventCategory"
+                    }, {
+                        Dataset: "safetyevents",
+                        Field: "ProviderID",
+                        Value: "@ProviderID"
+                    },
+                    {
+                        Dataset: "safetyevents",
+                        Field: "LocationName",
+                        Value: "@LocationName"
+                    },
+                    {
+                        Dataset: "safetyevents",
+                        Field: "Year",
+                        Value: "@Year"
+                    },
+                    {
+                        Dataset: "safetyevents",
+                        Field: "MonthNumber",
+                        Value: "@Month"
+                    }
+                    ]
+                }
+            }, {
+                Name: "TimeSeriesChart",
+                Provider: "highcharts",
+                Content: timeSeriesDefault,
+                RenderTo: "timeSeriesDiv",
+                RenderOnLoad: true,
+                SeriesCollection: [
+                    {
+                        Fields: ["eventcategory"],
+                        name: "{{eventcategory}}",
+                        data: {
+                            Fields: ["monthno", "monthname", "SumOfEventTypes"],
+                            name: "{{monthname}}",
+                            y: "{{SumOfEventTypes}}"
+                        },
+                        onClick: function (event) {
+                            showFilters(event);
+                        },
+                        onClear: function () {
+                            var chart = this.ChartProvider;
+                            var specter = chart.Parent;
+                            var timeChart = specter.getChart("TimeSeriesChart");
+                            delete timeChart.Selected;
+                            timeChart.Render();
+                        },
+                        LinkedItems: [{
+                            Name: "EventTypeChart",
+                            Type: "Chart",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@Month",
+                                Value: "{{data.monthno}}"
+                            }]
+                        }, {
+                            Name: "FunnelChart",
+                            Type: "Chart",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@Month",
+                                Value: "{{data.monthno}}"
+                            }]
+                        }, {
+                            Name: "YearSlicer",
+                            Type: "Slicer",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@Month",
+                                Value: "{{data.monthno}}"
+                            }]
+                        }, {
+                            Name: "LocationSlicer",
+                            Type: "Slicer",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@Month",
+                                Value: "{{data.monthno}}"
+                            }]
+                        }
+                        ]
+                    }
+                ],
+                Parameters: [{
+                    Name: "@EventCategory"
+                },
+                {
+                    Name: "@LocationName"
+                },
+                {
+                    Name: "@EventType"
+                },
+                {
+                    Name: "@Year"
+                },
+                {
+                    Name: "@ProviderID"
+                }
+                ],
+                QuerySet: {
+                    Select: [
+                        {
+                            Field: "safetyevents.EventCategory",
+                            Dataset: "safetyevents",
+                            Aggregation: "",
+                            Alias: "eventcategory"
+                        },
+                         {
+                             Field: "safetyevents.MonthNumber",
+                             Dataset: "safetyevents",
+                             Aggregation: "",
+                             Alias: "monthno",
+                             Order: "ASC"
+                         },
+                         {
+                             Field: "safetyevents.MonthName",
+                             Dataset: "safetyevents",
+                             Aggregation: "",
+                             Alias: "monthname"
+                         },
+                        {
+                            Field: "safetyevents.numerator",//"(CAST(sum(safetyevents.numerator) AS float)/CAST(sum(safetyevents.denominator) AS float)) * 100 ",
+                            Dataset: "safetyevents",
+                            Aggregation: "sum",
+                            Alias: "SumOfEventTypes"
+                        }
+                    ],
+                    Where: [{
+                        Dataset: "safetyevents",
+                        Field: "EventCategory",
+                        Value: "@EventCategory"
+                    },
+                        {
+                            Dataset: "safetyevents",
+                            Field: "ProviderID",
+                            Value: "@ProviderID"
+                        },
+                        {
+                            Dataset: "safetyevents",
+                            Field: "LocationName",
+                            Value: "@LocationName"
+                        },
+                        {
+                            Dataset: "safetyevents",
+                            Field: "EventType",
+                            Value: "@EventType"
+                        },
+                        {
+                            Dataset: "safetyevents",
+                            Field: "Year",
+                            Value: "@Year"
+                        }
+                    ]
+                }
+            }
+            , {
+                Name: "FunnelChart",
+                Provider: "highcharts",
+                Content: funnelPlotChart,
+                RenderTo: "funnelchartDiv",
+                CanRender: false,// if false - chart or slicer will not be rendered at all (explain the use case)
+                RenderOnLoad: false,
+              
+                SeriesCollection: [
+                    {
+                        name: '{{emplstatus}}',
+
+                        type: 'scatter',
+                        marker: {
+                            radius: 3,
+                        },
+                        zIndex: 1,
+                        tooltip: { pointFormat: '<b>{point.name}</b><br />Rate: <b>{point.y}</b><br />Denominator: <b>{point.x}</b>', headerFormat: '' },
+                        Fields: ["emplstatus"],
+                        onLoad: function (series, event) {
+                            var chartprov = series.options.ChartProvider;
+                            var specter = chartprov.Parent;
+                            var provid = specter.getParameterValue('@ProviderID');
+
+                            $.each(series.data, function (i, point) {
+                                if(point['provid'] == provid)
+                                {
+                                    point.update({
+                                        marker : {
+                                            radius: 10,
+                                            symbol: 'circle',
+                                            fillColor: '#1BCA32',
+                                            lineWidth: 2,
+                                            lineColor: '#FFFFFF' // inherit from series
+                                        }
+                                    });
+                                }
+                            });
+                        },
+                        data: {
+                            Fields: ["provid","provname", "denominator", "rate"],
+                            name: "{{provname}}",
+                            x: "{{denominator}}",
+                            y: "{{rate}}",
+                            //marker: {
+                            //    radius: 7,
+                            //    fillcolor: '#2EE42E',
+                            //    symbol: 'circle',
+                            //}
+                        },
+                        onClick: function (event) {
+                            showFilters(event);
+                        },
+                        onClear: function () {
+                            var chart = this.ChartProvider;
+                            var specter = chart.Parent;
+                            var selectedChart = specter.getChart("FunnelChart");
+                            delete selectedChart.Selected;
+                            selectedChart.Render();
+                        },
+                        LinkedItems: [{
+                            Name: "EventTypeChart",
+                            Type: "Chart",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@ProviderID",
+                                Value: "{{data.provid}}"
+                            }]
+                        },
+                        {
+                            Name: "TimeSeriesChart",
+                            Type: "Chart",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@ProviderID",
+                                Value: "{{data.provid}}"
+                            }]
+                        },
+                        {
+                            Name: "LocationSlicer",
+                            Type: "Slicer",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@ProviderID",
+                                Value: "{{data.provid}}"
+                            }]
+                        },
+                        {
+                            Name: "YearSlicer",
+                            Type: "Slicer",
+                            Action: "SLICE",
+                            Parameters: [{
+                                Name: "@ProviderID",
+                                Value: "{{data.provid}}"
+                            }]
+                        }
+                        ]
+                    },
+
+                    {
+                        name: 'Average',
+                        /*showInLegend: false,*/
+                        type: "line",
+                        lineWidth: .75,
+                        color: avgColor,
+                        Fields: [],
+                        data: {
+                            Fields: ["denominator", "systemaverage"],
+                            x: "{{denominator}}",
+                            y: "{{systemaverage}}",
+                        },
+                        marker: { enabled: false },
+                        enableMouseTracking: false
+                    }
+                    ,
+                    {
+                        name: 'Lower',
+                        type: "line",
+                        showInLegend: false,
+                        color: funnelColor,
+                        lineWidth: .5,
+                        Fields: [],
+                        data: {
+                            Fields: ["denominator", "lowerlimit"],
+                            x: "{{denominator}}",
+                            y: "{{lowerlimit}}",
+                        },
+                        marker: { enabled: false },
+                        dashStyle: 'ShortDash',
+                        enableMouseTracking: false
+                    },
+                    {
+
+                        name: 'Upper',
+                        type: "line",
+                        showInLegend: false,
+                        color: funnelColor,
+                        lineWidth: .5,
+                        Fields: [],
+                        data: {
+                            Fields: ["denominator", "upperlimit"],
+                            x: "{{denominator}}",
+                            y: "{{upperlimit}}",
+                        },
+                        marker: { enabled: false },
+                        dashStyle: 'ShortDash',
+                        enableMouseTracking: false
+                    },
+                     {
+                         name: 'funnelFill',
+                         showInLegend: false,
+                         fillColor: funnelFillColor,
+                         lineWidth: 0,
+                         type: 'arearange',
+                         Fields: [],
+                         data: {
+                             Fields: ["denominator", "lowerlimit", "upperlimit"],
+                             x: "{{denominator}}",
+                             low: "{{lowerlimit}}",
+                             high: "{{upperlimit}}"
+                         },
+                         marker: { enabled: false },
+                         enableMouseTracking: false,
+                     }
+                ],
+                Parameters: [{
+                  Name :"@Emplstatus"  
+                },{
+                    Name: "@EventCategory"
+                }, {
+                    Name:"@Year"
+                },
+                {
+                    Name: "@LocationName"
+                }, 
+                {
+                    Name: "@Month"
+                },
+                {
+                    Name :"@EventType"
+                }
+                ],
+                QuerySet: {
+                    DatasetParams: [{
+                        Dataset: "funnelplotsp",
+                        Parameters: [
+                            {
+                                Name: "@EventCategory",
+                                Value: "@EventCategory"
+                            },
+                           {
+                               Name: "@EventType",
+                               Value: "@EventType" //this ID will be checked in either Chart.Parameters or Specter.Parameters
+                           },{
+                               Name: "@Emplstatus",
+                               Value: "@Emplstatus"
+                           },
+                            {
+                            Name: "@ProviderID",
+                            Value: "@ProviderID" //this ID will be checked in either Chart.Parameters or Specter.Parameters
+                        }
+                        ,
+                        {
+                            Name: "@Year",
+                            Value: "@Year"
+                        }, {
+                            Name: "@MonthNumber",
+                            Value: "@Month"
+                        }
+                        , {
+                            Name: "@LocationName",
+                            Value: "@LocationName"
+                        }
+                        ]
+                    }],
+                    Select: [{
+                        Field: "provlist.EMPL_STATUS",
+                        Dataset: "provlist",
+                        Aggregation: "",
+                        Alias: "emplstatus"
+                    }, {
+                        Field: "providerid",
+                        Dataset: "funnelplotsp",
+                        Aggregation: "",
+                        Alias: "provid"
+                    },
+                        {
+                            Field: "providername",
+                            Dataset: "funnelplotsp",
+                            Aggregation: "",
+                            Alias: "provname"
+                        },
+                        {
+                            Field: "denominator",
+                            Dataset: "funnelplotsp",
+                            Aggregation: "",
+                            Alias: "",
+                            Order: "ASC"
+                        },
+                         {
+                             Field: "rate",
+                             Dataset: "funnelplotsp",
+                             Aggregation: "",
+                             Alias: ""
+                         },
+                         {
+                             Field: "systemaverage",
+                             Dataset: "funnelplotsp",
+                             Aggregation: "",
+                             Alias: ""
+                         },
+                         {
+                             Field: "lowerlimit",
+                             Dataset: "funnelplotsp",
+                             Aggregation: "",
+                             Alias: ""
+                         },
+                         {
+                             Field: "upperlimit",
+                             Dataset: "funnelplotsp",
+                             Aggregation: "",
+                             Alias: ""
+                         }
+                    ]
+                }
+            }],
+            Slicers: [{
+                Name: "LocationSlicer",
+                Text: "{{locname}}",
+                Value: "{{locname}}",
+                Heading: "Location",
+                RenderTo: "LocationSlicerDiv",
+                RenderOnLoad: true,
+                onClick: function (event) {
+                    showFilters(event);
+                },
+                onClear: function () {
+                    var slicer = this;
+                    var specter = slicer.Parent;
+                    var slicer = specter.getSlicer("LocationSlicer");
+                    delete slicer.Selected;
+                    slicer.Render();
+                },
+                Parameters: [{
+                    Name: "@ProviderID"
+                }, {
+                    Name: "@EventType"
+                }, {
+                    Name: "@Year"
+                }, {
+                    Name: "@Month"
+                }],
+                LinkedItems: [{
+                    Action: "SLICE",
+                    Name: "FunnelChart",
+                    Type: "Chart",
+                    Parameters: [{
+                        Name: "@LocationName",
+                        Value: "{{Value}}" //can pass only Value or Text
+                    }]
+                },
+                {
+                    Action: "SLICE",
+                    Name: "TimeSeriesChart",
+                    Type: "Chart",
+                    Parameters: [{
+                        Name: "@LocationName",
+                        Value: "{{Value}}" //can pass only Value or Text
+                    }]
+                },
+                {
+                    Action: "SLICE",
+                    Name: "EventTypeChart",
+                    Type: "Chart",
+                    Parameters: [{
+                        Name: "@LocationName",
+                        Value: "{{Value}}" //can pass only Value or Text
+                    }]
+                },
+                {
+                    Action: "SLICE",
+                    Name: "GroupChart",
+                    Type: "Chart",
+                    Parameters: [{
+                        Name: "@LocationName",
+                        Value: "{{Value}}" //can pass only Value or Text
+                    }]
+                },
+                {
+                    Action: "SLICE",
+                    Name: "YearSlicer",
+                    Type: "Slicer",
+                    Parameters: [{
+                        Name: "@LocationName",
+                        Value: "{{Value}}" //can pass only Value or Text
+                    }]
+                }
+                ],
+                QuerySet: {
+                    Select: [
+                       {
+                           Field: "LocationName",
+                           Dataset: "safetyevents",
+                           Aggregation: "distinct",
+                           Alias: "locname"
+                       }
+                    ],
+                    Where: [{
+                        Dataset: "safetyevents",
+                        Field: "EventCategory",
+                        Value: "@EventCategory"
+                    }, {
+                        Dataset: "safetyevents",
+                        Field: "ProviderID",
+                        Value: "@ProviderID"
+                    }, {
+                        Dataset: "safetyevents",
+                        Field: "EventType",
+                        Value: "@EventType"
+                    },
+                    {
+                        Dataset: "safetyevents",
+                        Field: "Year",
+                        Value: "@Year"
+                    },
+                    {
+                        Dataset: "safetyevents",
+                        Field: "MonthNumber",
+                        Value: "@Month"
+                    }]
+                }
+            },
+            {
+                Name: "YearSlicer",
+                Text: "{{year}}",
+                Value: "{{year}}",
+                Heading: "Year",
+                RenderTo: "YearSlicerDiv",
+                RenderOnLoad: true,
+                onClick: function (event) {
+                    showFilters(event);
+                },
+                onClear: function () {
+                    var slicer = this;
+                    var specter = slicer.Parent;
+                    var slicer = specter.getSlicer("YearSlicer");
+                    delete slicer.Selected;
+                    slicer.Render();
+                },
+                Parameters: [{
+                    Name: "@EventCategory"
+                }, {
+                    Name: "@ProviderID"
+                }, {
+                    Name :"@EventType"
+                }, {
+                    Name: "@LocationName"
+                }, {
+                    Name: "@Month"
+                }],
+                LinkedItems: [{
+                    Action: "SLICE",
+                    Name: "FunnelChart",
+                    Type: "Chart",
+                    Parameters: [{
+                        Name: "@Year",
+                        Value: "{{Value}}" //can pass only Value or Text
+                    }]
+                },
+                {
+                    Action: "SLICE",
+                    Name: "TimeSeriesChart",
+                    Type: "Chart",
+                    Parameters: [{
+                        Name: "@Year",
+                        Value: "{{Value}}" //can pass only Value or Text
+                    }]
+                },
+                {
+                    Action: "SLICE",
+                    Name: "EventTypeChart",
+                    Type: "Chart",
+                    Parameters: [{
+                        Name: "@Year",
+                        Value: "{{Value}}" //can pass only Value or Text
+                    }]
+                },
+                 {
+                     Action: "SLICE",
+                     Name: "GroupChart",
+                     Type: "Chart",
+                     Parameters: [{
+                         Name: "@Year",
+                         Value: "{{Value}}" //can pass only Value or Text
+                     }]
+                 },
+                {
+                    Action: "SLICE",
+                    Name: "LocationSlicer",
+                    Type: "Slicer",
+                    Parameters: [{
+                        Name: "@LocationName",
+                        Value: "{{Value}}" //can pass only Value or Text
+                    }]
+                }],
+                QuerySet: {
+                    Select: [
+                       {
+                           Field: "year",
+                           Dataset: "safetyevents",
+                           Aggregation: "distinct",
+                           Alias: "year"
+                       }
+                    ],
+                    Where: [{
+                        Dataset: "safetyevents",
+                        Field: "EventCategory",
+                        Value: "@EventCategory"
+                    }, {
+                        Dataset: "safetyevents",
+                        Field: "ProviderID",
+                        Value: "@ProviderID"
+                    },{
+                            Dataset: "safetyevents",
+                            Field: "EventType",
+                            Value: "@EventType"
+                    },
+                    {
+                        Dataset: "safetyevents",
+                        Field: "LocationName",
+                        Value: "@LocationName"
+                    },
+                    {
+                        Dataset: "safetyevents",
+                        Field: "MonthNumber",
+                        Value: "@Month"
+                    }]
+                }
+            }, {
+                Name: "EmplStatusSlicer",
+                Text: "{{empl_status}}",
+                Value: "{{empl_status}}",
+                Heading: "Employee Status",
+                RenderTo: "EmplStatusDiv",
+                RenderOnLoad: true,
+                onClick: function (event) {
+                    showFilters(event);
+                },
+                onClear: function () {
+                    var slicer = this;
+                    var specter = slicer.Parent;
+                    var slicer = specter.getSlicer("EmplStatusSlicer");
+                    delete slicer.Selected;
+                    slicer.Render();
+                },
+                Parameters: [{
+                    Name: "@ProviderID"
+                }, {
+                    Name: "@EventType"
+                }, {
+                    Name: "@LocationName"
+                }, {
+                    Name: "@Month"
+                }],
+                LinkedItems: [{
+                    Action: "SLICE",
+                    Name: "FunnelChart",
+                    Type: "Chart",
+                    Parameters: [{
+                        Name: "@Emplstatus",
+                        Value: "{{Value}}" //can pass only Value or Text
+                    }]
+                }],
+                QuerySet: {
+                    Select: [
+                       {
+                           Field: "distinct(provlist.EMPL_STATUS)",
+                           Dataset: "provlist",
+                           Aggregation: "",
+                           Alias: "empl_status"
+                       }
+                    ],
+                    Where: [
+                    {
+                        Dataset: "safetyevents",
+                        Field: "Loc_Name",
+                        Value: "@LocationName"
+                    }]
+                }
+            }
+           ]
+        };
+        Highcharts.theme = {
+            colors: ['#058DC7', '#50B432', '#ED561B', '#DDDF00', '#24CBE5', '#64E572',
+                     '#FF9655', '#FFF263', '#6AF9C4']
+        }
+        // Apply the theme
+        Highcharts.setOptions(Highcharts.theme);
+        var s = new Specter();
+        s.Load(specValue);
+      //  setTimeout(function () {
+        s.setParameter("@ProviderID", "H101536");
+        s.Render();
+
+
+        // }, 2000);
+
+        function showFilters(event) {
+            var value, datapoint;
+
+            if (event.SourceType == "Chart") {
+                datapoint = event.point;
+                value = datapoint["name"];
+            }
+            else {
+                datapoint = event.Selected;
+                value = datapoint["Value"];
+            }
+
+            var $content = $("<div class='content'><span>" + value + "</span></div>");
+            var $removefilter = $('<span class="slicer-clear">x</span>');
+            $content.append($removefilter);
+            $('#filters').append($content)
+            //Log(datapoint["name"]);
+            $removefilter.on('click', function () {
+                var item = event.Source;
+                item.Clear();
+                $(this).closest('.content').remove();
+            });
+        }
+    </script>
+    <style>
+        .slicer {
+            border: 1px solid;
+            display: inline-block;
+            overflow: auto;
+        }
+
+        .slicer-content {
+            overflow: auto;
+            text-align: center;
+            height: 170px;
+        }
+
+        .slicer-content-selected {
+            background-color: #CAE7FF;
+        }
+
+        .slicer-clear {
+            /*background-image: url("Images/delete.png");
+                width:5px;
+                height:5px;*/
+            float: right;
+            font-family: sans-serif;
+            cursor: pointer;
+        }
+
+        .slicer-content .content {
+            border: 1px solid;
+            margin: 2px;
+            padding: 5px;
+            cursor: pointer;
+        }
+
+        .filter-content .content {
+            border: 1px solid;
+            margin: 2px;
+            padding: 5px;
+            cursor: pointer;
+            width: 220px;
+            display: inline-block;
+        }
+
+        .slicer-table {
+            text-align: center;
+            margin: 5px;
+        }
+
+            .slicer-table td {
+                border: 1px solid;
+                padding: 8px;
+                cursor: pointer;
+            }
+
+        .slicer .heading {
+            padding: 5px;
+            border-bottom: 1px solid;
+        }
+    </style>
+
+</head>
+<body>
+    <div id="paretochartDiv" style="width:700px; height: 300px;float:left"></div>
+    <div id="timeSeriesDiv" style="width:500px; height: 300px;float:left"></div>
+    <div id="funnelchartDiv" style="width:500px; height: 500px;float:left"></div>
+    <div id="LocationSlicerDiv" class="slicer" style="width: 200px; height: 200px;"></div>
+    <div id="YearSlicerDiv" class="slicer" style="width: 200px; height: 200px;"></div>
+    <div id="EmplStatusDiv" class="slicer" style="width: 200px; height: 200px;"></div>
+    <div id="filters" class="filter-content"></div>
+</body>
+</html>
